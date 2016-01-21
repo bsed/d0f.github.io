@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width">
+    <title>Linux下恢复删除的文件 - 一心的博客
+    </title>
+    <link rel="alternate" href="http://gnux.cn/feed.xml" type="application/rss+xml" title="Ramblings of an immor(t)al demigod">
+    <link rel="stylesheet" href="http://fonts.useso.com/css?family=Lora:400,700,400italic,700italic|Anonymous+Pro:400,700,400italic,700italic|Merriweather:400,700,300">
+    <link rel="stylesheet" href="/css/main.css">
+  </head>
+  <body class="article-detail">
+    <header class="header">
+      <div class="content-wrap">
+        <h1>Linux下恢复删除的文件</h1>
+        <p class="author">Written by <span class="author"><a href="mailto:admin@gnux.cn">kelvin</a></span>
+        </p>
+      </div>
+    </header>
+    <div id="content">
+      <div class="content-wrap">
+        <article class="article">
+          <section class="content"><p>Linux下执行 rm&nbsp;并不会真正删除，而是将inode节点中的扇区删除，同时释放数据块。在数据块被系统重新分配前，这部分数据还是可以找回来的。</p>
+<p>网上说在删除文件后要立即unmount这个分区，这样做其实是为了让外界不再写入，我们也可以设置为readonly模式代替。当然，如果为了不影响其它应用的运行，也可以不做unmount。</p>
+<p>好的，现在就该神器extundelete上场了。以CentOS6.5为例</p>
+<h2 id="-">依赖</h2>
+<pre><code class="lang-shell">yum -y install e2fsprogs e2fsprogs-libs e2fsprogs-devel
+</code></pre>
+<h2 id="-">安装</h2>
+<pre><code class="lang-bash">wget http://jaist.dl.sourceforge.net/project/extundelete/extundelete/<span class="number">0.2</span>.<span class="number">4</span>/extundelete-<span class="number">0.2</span>.<span class="number">4</span>.tar.bz2
+tar jxvf extundelete-<span class="number">0.2</span>.<span class="number">4</span>.tar.bz2
+<span class="built_in">cd</span> extundelte-<span class="number">0.2</span>.<span class="number">4</span>
+./configure
+make; make install
+</code></pre>
+<h2 id="-">查找要恢复的驱动器名</h2>
+<pre><code class="lang-bash">df
+Filesystem             <span class="number">1</span>K-blocks     Used   Available Use% Mounted on
+/dev/sda1                 <span class="number">495844</span>    <span class="number">64150</span>      <span class="number">406094</span>  <span class="number">14</span>% /
+</code></pre>
+<h2 id="-">运行恢复</h2>
+<p>默认恢复到当前目录下的RECOVERED_FILES目录中去</p>
+<h2 id="-">恢复单个文件</h2>
+<pre><code class="lang-bash">extundelete /dev/sdb1 --restore-file hosts
+</code></pre>
+<h2 id="-">恢复一个目录</h2>
+<pre><code class="lang-bash">extundelete /dev/sdb1 --restore-files <span class="built_in">test</span>/
+</code></pre>
+<h2 id="-">恢复整个分区</h2>
+<pre><code class="lang-bash">extundelete /dev/sdb1 –-restore-all
+</code></pre>
+<p>这个工具貌似支持<span class="caps">EXT4</span>文件系统，经过实际测试，restore-all比较好用，在初次删除后可以很好的恢复文件及目录结构，但是如果我在相同位置新建了相同的文件名或者目录名，就会恢复失败（找不到了）。而恢复单独的文件或者目录则没有成功.</p>
+</section>
+        </article>
+      </div>
+    </div>
+    <footer>
+      <div class="content-wrap">
+        <div class="nav"><a href="/">« Full blog</a></div>
+        <section class="about"><p>This blog is made by <a href="http://gnux.cn">kelvin</a> and licensed under the <a href="http://opensource.org/licenses/MIT">MIT-license</a>.
+This footer text can be edited in about.md</p>
+<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+consequat.</p>
+<p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+dolore eu fugiat nulla pariatur.</p>
+<p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
+deserunt mollit anim id est laborum.</p>
+
+        </section>
+        <section class="copy">
+          <p>&copy; 2016 kevlin &mdash; powered by&nbsp;<a href="http://gnux.cn">kelvin</a>
+          </p>
+        </section>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width">
+    <title>PHP实现BigPipe分chunked输出! - 一心的博客
+    </title>
+    <link rel="alternate" href="http://gnux.cn/feed.xml" type="application/rss+xml" title="Ramblings of an immor(t)al demigod">
+    <link rel="stylesheet" href="http://fonts.useso.com/css?family=Lora:400,700,400italic,700italic|Anonymous+Pro:400,700,400italic,700italic|Merriweather:400,700,300">
+    <link rel="stylesheet" href="/css/main.css">
+  </head>
+  <body class="article-detail">
+    <header class="header">
+      <div class="content-wrap">
+        <h1>PHP实现BigPipe分chunked输出!</h1>
+        <p class="author">Written by <span class="author"><a href="mailto:admin@gnux.cn">kelvin</a></span>
+        </p>
+      </div>
+    </header>
+    <div id="content">
+      <div class="content-wrap">
+        <article class="article">
+          <section class="content"><p>在Yahoo系的最佳实践里，建议把静态的内容尽早的输出，在&nbsp;head之后就调用flush，让浏览器可以尽早去加载静态资源，包括脚本、样式、图片（javascipt，css，image一般是外链的形式）等等，后台如果有多个数据源或者api需要调用，尽可能做到完成一个输出一个，通过js在前端拼装页面，进而达到优化用户体验的效果，用户等待的时间，是木桶最短的那快木板。</p>
+<h2 id="-">技术原理</h2>
+<p>下面是引用：</p>
+<blockquote>
+<p>Flush the Buffer Early
+tag: server
+When users request a page, it can take anywhere from 200 to 500ms for the &gt; backend server to stitch together the <span class="caps">HTML</span> page. During this time, the browser is idle as it waits for the data to arrive. In PHP you have the function flush(). It allows you to send your partially ready HTML response to the browser so that the browser can start fetching components while your backend is busy with the rest of the HTML page. The benefit is mainly seen on busy backends or light frontends.
+A good place to consider flushing is right after the HEAD because the HTML for the head is usually easier to produce and it allows you to include any CSS and JavaScript files for the browser to start fetching in parallel while the backend is still&nbsp;processing.</p>
+</blockquote>
+<p><strong>Example:</strong></p>
+<pre><code class="lang-php">      ... &lt;!-- css, js --&gt;
+    &lt;/head&gt;
+    <span class="preprocessor">&lt;?php</span> flush(); <span class="preprocessor">?&gt;</span>
+    &lt;body&gt;
+      ... &lt;!-- content --&gt;
+</code></pre>
+<p>Facebook提出的BigPipe技术，将这种思想有了更具体的实现，大体思路是，分解网页成叫做Pagelets的小块，然后通过Web服务器和浏览器建立管道并管理他们在不同阶段的运行。&nbsp;在php下做个小测试，</p>
+<pre><code class="lang-php"><span class="preprocessor">&lt;?php</span>
+<span class="keyword">echo</span> <span class="string">'xxxxxxxxxxxxxxxxxxxxxxx&lt;br&gt;'</span>;
+ob_flush();
+flush();
+sleep(<span class="number">2</span>);
+<span class="keyword">echo</span> <span class="string">"b"</span>;
+<span class="preprocessor">?&gt;</span>
+</code></pre>
+<p>结果可以看到在ie下（7，8），不管输出内容的大小，都可以看到效果，“b“在2秒后输出，在firefox和chrome，两段文本都在2秒后展现，说明浏览器做了缓存，经过实验，缓存的大小为1024，刚好1k，也是浏览器做的优化。通过返回头可以看出，在分段输出的时候，返回包没有经过gzip。&nbsp;通过wireshark可以看到后台输出确实是一个个chunked过来的，看来是浏览器做了工作，猜测：缓存大小应该是1024B或者<span class="caps">MTU</span>大小（1400B多点，看网络情况），首段输出增大到1024的时，chrome和firefox都开始正常表演了，页面里的js、css和图片在第一段下载完已经开始加载。</p>
+<p><strong>应该思考的问题：</strong></p>
+<p>1、传输效率，尽量利用一次传输传送尽量多的东西，根据<span class="caps">MTU</span>大小调整；
+2、同步加载，第一块送过来的东西，尽量可以同步加载，需要注意不同浏览器可以同步加载域名的数量，需要考虑javascript对加载的block，对于不用立刻执行的内容，可以通过加defer或者干脆注释掉，等页面完成在eval进来；
+3、适用范围，任何一个技术都有自己适用的场景，对于后台需要访问多个api的应用会更适合一些，像社交类的网站，搜索之类的本来就在100ms左右就展现完毕，纯玩儿技术就没意义了，chunked也不是分的越多越好，适当的，类似的最好合并起来；&nbsp;4、ob_flush和flush最好结对使用，某些情况下，当用flush是没有效果的。</p>
+<p><strong>参考：</strong></p>
+<p><a href="http://willko.iteye.com/blog/685319">http://willko.iteye.com/blog/685319</a></p>
+<p><a href="http://developer.yahoo.com/performance/rules.html#flush">http://developer.yahoo.com/performance/rules.html#flush</a></p>
+<p><a href="http://www.laruence.com/index.php?s=php&amp;x=0&amp;y=0">http://www.laruence.com/index.php?s=php&amp;x=0&amp;y=0</a></p>
+<p><a href="http://isux.tencent.com/bigpipe-pipelining-web-pages-for-high-performance.html">http://isux.tencent.com/bigpipe-pipelining-web-pages-for-high-performance.html</a></p>
+<p><a href="http://baike.baidu.com/view/4601904.htm">http://baike.baidu.com/view/4601904.htm</a></p>
+<p><a href="http://software.intel.com/zh-cn/blogs/2009/02/04/400001071/">http://software.intel.com/zh-cn/blogs/2009/02/04/400001071/</a></p>
+</section>
+        </article>
+      </div>
+    </div>
+    <footer>
+      <div class="content-wrap">
+        <div class="nav"><a href="/">« Full blog</a></div>
+        <section class="about"><p>This blog is made by <a href="http://gnux.cn">kelvin</a> and licensed under the <a href="http://opensource.org/licenses/MIT">MIT-license</a>.
+This footer text can be edited in about.md</p>
+<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+consequat.</p>
+<p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+dolore eu fugiat nulla pariatur.</p>
+<p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
+deserunt mollit anim id est laborum.</p>
+
+        </section>
+        <section class="copy">
+          <p>&copy; 2016 kevlin &mdash; powered by&nbsp;<a href="http://gnux.cn">kelvin</a>
+          </p>
+        </section>
+      </div>
+    </footer>
+  </body>
+</html>

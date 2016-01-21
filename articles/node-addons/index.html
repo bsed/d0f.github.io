@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width">
+    <title>如何方便快捷的进行 node-addons 开发 - 一心的博客
+    </title>
+    <link rel="alternate" href="http://gnux.cn/feed.xml" type="application/rss+xml" title="Ramblings of an immor(t)al demigod">
+    <link rel="stylesheet" href="http://fonts.useso.com/css?family=Lora:400,700,400italic,700italic|Anonymous+Pro:400,700,400italic,700italic|Merriweather:400,700,300">
+    <link rel="stylesheet" href="/css/main.css">
+  </head>
+  <body class="article-detail">
+    <header class="header">
+      <div class="content-wrap">
+        <h1>如何方便快捷的进行 node-addons 开发</h1>
+        <p class="author">Written by <span class="author"><a href="mailto:admin@gnux.cn">kelvin</a></span>
+        </p>
+      </div>
+    </header>
+    <div id="content">
+      <div class="content-wrap">
+        <article class="article">
+          <section class="content"><p>开始前的说明及准备</p>
+<ul>
+<li>Addons node 原生插件，以下用 addons&nbsp;代指。</li>
+<li>node-gyp 辅助开发 addon&nbsp;的工具</li>
+<li>build-essential 如 gcc、make、cmake、python、gdb&nbsp;等</li>
+<li>文档<ul>
+<li><a href="https://developers.google.com/v8/embed">https://developers.google.com/v8/embed</a></li>
+<li><a href="https://nodejs.org/api/addons.html">https://nodejs.org/api/addons.html</a></li>
+</ul>
+</li>
+</ul>
+<p>关键词：node原生插件开发、使用<span class="caps">IDE</span>开发node-addon、node-gyp、gyp、ninja</p>
+<h2 id="-">简单介绍</h2>
+<p>node addons （node原生插件）用来扩展 node 能力，有一些对性能敏感的功能需要实现为原生插件，也为了对接原有 C、<span class="caps">CPP</span> 等开发的库。从表象上是一个动态链接库，是 v8 提供的插件接口，这就意味着每次 v8&nbsp;的升级就会导致接口的不兼容，需要重新在新版本下编译或者修改接口。</p>
+<blockquote>
+<p>node 升级导致 addons 不好使的情况很常见，几乎一个大版本都会出现类似的问题，这让维护一个 addons&nbsp;项目变得复杂。</p>
+</blockquote>
+<p>addons 可以用 cpp、c 等语言进行开发，接入 node 的 wrap 层需要使用 cpp 编写。开发一个 cpp 程序，特别是大型项目中有个好的 <span class="caps">IDE</span>&nbsp;支持无疑能让开发快很多（特别是修改已有项目），本篇文章就围绕这个话题展开。</p>
+<p>如何开发直接看文档即可，主要介绍周边开发工具，先从 node-gyp&nbsp;开发。</p>
+<h2 id="-node-gyp-ide-">让 node-gyp 生成不同 <span class="caps">IDE</span>&nbsp;项目文件</h2>
+<p>node-gyp 实则包装了 gyp，其位 Google V8 项目中使用的构建工具，它非常好用，可以说是对各大构建工具再包装提供简易的配置文件 - <span class="caps">JSON</span>，最终编译的时候可以生成各种编译工具项目文件，如&nbsp;cmake、ninja、vs、make等。</p>
+<blockquote>
+<p>gyp 的项目地址 <a href="https://chromium.googlesource.com/external/gyp/">https://chromium.googlesource.com/external/gyp/</a></p>
+</blockquote>
+<p>node-gyp 提供了很多功能，但用户文档根本就没写出来。这会让开发变得很局促。我开发的时候由于网络被非可抗因素导致很慢，当第一次启动 node-gyp 进行编译的时候，其会下载当前使用 node 版本的源码，获取头文件及其必要的&nbsp;library。这个过程很漫长，我忍无可忍就开始寻求办法，看源码中是否留了直接指定源码包的接口，过不其然其中包含这样的接口。</p>
+<pre><code>node-gyp rebuild --tarball=&lt;path to node soruce tar.gz&gt;
+</code></pre><p><code>--tarball</code> 参数就是干这个事情了，用提前下载好的源码包路径设置参数。</p>
+<p>由于刚才说到的 v8 升级会导致预编译的二进制包无法使用，这时候就需要提前编译好多个版本的二进制插件包。如何编译出特定 node&nbsp;版本下的插件使用如下命令。</p>
+<pre><code>node-gyp rebuild --target=0.10.0
+</code></pre><p><code>--target</code> 设置为 node&nbsp;的版本号。</p>
+<p>有时候还需要在同一台机器上编译不同体系（x86，x64）下的插件</p>
+<pre><code>node-gyp rebuild --arch=ia32
+node-gyp rebuild --arch=x64
+</code></pre><p>对于个人是不需要考虑这些事情的，因为自己编译自己用。但当你开发的插件打算分享给别人的时候，就得考虑对方的操作系统、arch、node版本等问题，提供给别人完整体验就得花费更多的心思。</p>
+<p>最近 node 又升级到 4.x&nbsp;时代了，无一例外，我的插件都跪了。面对这样的事实我也比较无奈。</p>
+<p>以前开发的时候为了兼容跨大版本引起的接口变动，使用了 <a href="https://github.com/nodejs/nan">nan</a> 这个兼容方案，后来也陆续了解过像 <a href="http://www.swig.org/">swig</a> 这样的兼容层模板。感觉这类东西能解决问题，就使用了 nan，谁曾想 4.x 时代还需要升级 nan，而 nan 的接口变动甚至能用看不懂来形容（其使用了各种 cpp template 技术），后再去看原生接口亲切了很多。遂花了点时间又改回原生接口，在改的过程中发现太多问题，都是 v8 接口使用问题。就想用 <span class="caps">IDE</span> 来帮助修改，因为 IDE&nbsp;有良好的接口提示功能。</p>
+<p>node-gyp 在 Windows 上会生成 visual studio 项目文件可直接用 <span class="caps">VS</span> 来做调整。但在 Mac 下其产出的是&nbsp;Makefile，就有点难办。</p>
+<p>以前研究 gyp 的时候发现，gyp 是可以支持生成 CMakeLists.txt （cmake 配置文件），而 <a href="https://www.jetbrains.com/clion/"><span class="caps">CLION</span></a> 是比较不错的一个 C、<span class="caps">CPP</span> IDE，支持用 CMakeLists.txt&nbsp;来初始化一个项目。</p>
+<p>这样只需要让 node-gyp 也同样生成 CMakeLists.txt&nbsp;即可</p>
+<p>使用 gyp&nbsp;的做法</p>
+<pre><code>gyp build.gyp --depth=. --generator-output=./output -f cmake
+gyp build.gyp --depth=. --generator-output=./output -f ninja
+</code></pre><p>使用 node-gyp&nbsp;的做法</p>
+<pre><code>很遗憾，其没有留接口，代码写死
+win =&gt; msbuild
+mac, linux, ... =&gt; make
+</code></pre><p>但其封装的是&nbsp;gyp，只是没有提供现成的接口而已，自己造；</p>
+<p>当我们用 node-gyp&nbsp;进行编译的时候，会输入</p>
+<p><img src="http://store.orrafy.com/get/uuid=ecdcc9be82674109036d8266eca3f74c" alt=""></p>
+<p>上图红框框住的地方不正是 gyp&nbsp;的调用，抠出来</p>
+<pre><code>/Users/shouding/Bin/lib/node_modules/node-gyp/gyp/gyp_main.py binding.gyp -f make -I /Users/shouding/Dev/fis2/dev/images/build/config.gypi -I /Users/shouding/Bin/lib/node_modules/node-gyp/addon.gypi -I /Users/shouding/.node-gyp/4.1.1/include/node/common.gypi -Dlibrary=shared_library -Dvisibility=default -Dnode_root_dir=/Users/shouding/.node-gyp/4.1.1 -Dnode_gyp_dir=/Users/shouding/Bin/lib/node_modules/node-gyp -Dnode_lib_file=node.lib -Dmodule_root_dir=/Users/shouding/Dev/fis2/dev/images --depth=.  --no-parallel --generator-output build -Goutput_dir=.
+</code></pre><p>其中有 <code>-f</code> 参数，修改为 <code>cmake</code>，执行这个命令即可得到 <code>./build/Release/CMakeLists.txt</code>，再用 <span class="caps">CLION</span> 打开 <code>Release</code> 目录就是一个完整的项目了，可以在 <span class="caps">IDE</span> 编译，修改错误以及编码（代码自动补全很&nbsp;nice）</p>
+<p>很快我的项目就改好接口了，假设我用 make&nbsp;一个一个去排除错误，修改到猴年马月都不能完成。</p>
+<p>同样，把这个思路推广一下，就会发现开发的时候也可以便捷的用 <span class="caps">IDE</span> 了，可能有人会说难道直接用 IDE 开发不就得了，当然开发是 OK 的，但是 IDE&nbsp;的各项环境设置几乎会让人死去活来好几次。</p>
+<h2 id="-gdb-node-">用 gdb 调试 node&nbsp;扩展</h2>
+<p>有时候必不可少的需要单步编译，做到这一点有个要求就是得用 debug 版的 node，俗称 node_g；这个需要自己编译 node 才能得到，编译 node 时添加 <code>--debug</code> 参数即可。</p>
+<pre><code>./configure --debug
+</code></pre><p>有了 node_g 就可以用 gdb 单步调试 node 了，包括你的扩展程序，gdb 调试是个复杂的话题，就不展开讨论了，Google&nbsp;之。</p>
+<h2 id="-">小结</h2>
+<p>开发程序主要需要调试方便，无黑盒，这样才能开发的开心。之所以大家喜欢开发脚本语言，是因为脚本语言调试简单。而静态语言开发调试就得看内存，所以合理的借助工具是很好的实践方法。</p>
+</section>
+        </article>
+      </div>
+    </div>
+    <footer>
+      <div class="content-wrap">
+        <div class="nav"><a href="/">« Full blog</a></div>
+        <section class="about"><p>This blog is made by <a href="http://gnux.cn">kelvin</a> and licensed under the <a href="http://opensource.org/licenses/MIT">MIT-license</a>.
+This footer text can be edited in about.md</p>
+<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+consequat.</p>
+<p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+dolore eu fugiat nulla pariatur.</p>
+<p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
+deserunt mollit anim id est laborum.</p>
+
+        </section>
+        <section class="copy">
+          <p>&copy; 2016 kevlin &mdash; powered by&nbsp;<a href="http://gnux.cn">kelvin</a>
+          </p>
+        </section>
+      </div>
+    </footer>
+  </body>
+</html>
